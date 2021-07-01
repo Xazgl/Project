@@ -51,3 +51,33 @@ $ rm style.css
 ### Удалить папку:
 
 `$ rm -rf namedir`
+
+
+## Работа с ветвями:
+
+
+### Создание новой ветви:
+`$ git branch new-branch`
+
+### Переключится на новую ветвь:
+`$ git checkout new-branch`
+
+### Вносим изменения в файлы и делаем  commit:
+`$ git commit -am "Commits name"`
+
+### Переходим обратно в главную ветвь разработки:
+`$ git checkout master`
+
+### Вносим измененения в файлы и делаем commit (необязательно)
+`$ git commit -am "Commits name"`
+
+
+### Делаем слияние ветвей (необходимо убедится что мы в ветке master `$ git status`)
+
+`$ git merge new-branch`
+
+### В случе конфликтов редактируем файлы и делаем индексацию файлов и commit:
+`$ git commit -am "Commits name"`
+
+### Просмотре всех веток:
+`$ git branch --list`
