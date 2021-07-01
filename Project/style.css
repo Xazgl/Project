@@ -1,0 +1,203 @@
+
+
+body{
+font-family:Arial;
+font-size:20px;
+
+ background-image: url(10.jpg);
+}
+
+
+#top {
+	background-color:black;
+	  background-repeat: no-repeat;
+	height:10px;
+margin-top:0
+}
+
+#left{
+
+	background-color:white;
+	  background-repeat: no-repeat;
+	height:10px;
+margin-top:0
+}
+
+.main:hover {
+ 
+ border-color: white;
+ font-size: 24px;
+ padding: 5px;
+ background-color:#008080;
+ border-width:thick;
+  border-style:double;
+}
+
+
+
+.main  {
+color:black;
+text-decoration:none;
+font-family:Roboto, sans-serif;
+font-size: 20px;
+list-style-type:none;
+}
+
+.main:hover {
+color:PapayaWhip;
+text-decoration: none;
+
+}
+
+.main2 {
+ list-style-type:none;
+
+
+}
+
+ #news {
+position:relative;
+height:700px;
+overflow-y:auto;	
+ width:100%;
+ background-image: url(2.jpg);
+ background-size:cover;
+ opacity:0.80;
+ background-attachment:fixed; /*фиксатор картинки */
+ border:ridge;
+}
+h3 {
+ text-align:center;
+ color:black 
+	
+}
+
+h2 {
+ text-align:center;
+ color:black 
+	
+}
+
+#overlay {
+color:black;
+opacity:1;
+position:absolute;
+left:0;
+top:0;
+height:700px;
+width:100%;
+background:rgba(255,255,255,0.8);
+ background-color:white;
+}
+
+#pic{
+height:300px;
+width:500px;
+text-align: center;	
+}
+
+#u {
+font-size:10px;
+color:black;	
+
+}
+
+.main3 {
+    list-style-type:none;
+    color:white;
+    font-size:12px;
+}
+#Podval{
+    text-align: center;
+    color:white;
+    font-size:18px;
+}
+
+
+
+.ul {
+color:black;	
+
+}
+
+h3 {
+Color:#2F4F4F		
+}
+
+h2{
+margin: 1em 0 0.5em 0;
+    color: #343434;
+    font-weight: normal;
+    font-family: 'Ultra', sans-serif;  
+    font-size: 36px;
+    line-height: 42px;
+    text-transform: uppercase;
+    text-shadow: 0 2px white, 0 3px #777;
+	
+	
+
+}
+
+#Ins a {
+color:white;
+text-decoration:none
+}
+
+#Ins a:hover {
+color:white;
+text-decoration: none;
+}
+
+#footer {
+position:fixed;
+bottom:0px;
+right:0px;	
+padding:10px;
+color:#008080;
+font-family: 'Akaya Telivigala', cursive;
+}
+
+
+
+.buttonicon{	
+ font-size:35px;
+
+}
+
+.buttonicon:hover {
+
+ font-size:50px;
+
+}	
+	
+/*Контакты*/	
+#contact {
+font-family: 'Akaya Telivigala', cursive;	
+color:#008080;	
+}
+
+#number:hover {
+font-size:30px;
+color:#008080;		
+}
+
+.titl {
+text-align:center;	
+font-size:20px;	
+font-family: 'Akaya Telivigala', cursive;	
+}
+
+#meincontact {
+	
+text-align:center;
+
+}
+/*rozvodka8*/
+#src{
+width: 100%;
+}
+
+/*Карта*/
+ymaps {
+    margin:auto;
+}

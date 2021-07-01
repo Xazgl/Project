@@ -1,0 +1,2380 @@
+teardown);
+}
+
+
+
+
+
+
+private function getAvailableSuites()
+{
+return $this->suiteRepository->getSuites();
+}
+
+
+
+
+
+
+
+
+
+private function findSuitesSpecifications($suites, $locator)
+{
+return $this->specificationFinder->findSuitesSpecifications($suites, $locator);
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Cli;
+
+use Behat\Testwork\Cli\Controller;
+use Behat\Testwork\Tester\Result\Interpretation\StrictInterpretation;
+use Behat\Testwork\Tester\Result\ResultInterpreter;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+
+
+
+
+
+
+final class StrictController implements Controller
+{
+
+
+
+private $resultInterpreter;
+
+
+
+private $strict;
+
+
+
+
+
+
+
+public function __construct(ResultInterpreter $resultInterpreter, $strict = false)
+{
+$this->resultInterpreter = $resultInterpreter;
+$this->strict = $strict;
+}
+
+
+
+
+public function configure(Command $command)
+{
+$command->addOption('--strict', null, InputOption::VALUE_NONE,
+'Passes only if all tests are explicitly passing.'
+);
+}
+
+
+
+
+public function execute(InputInterface $input, OutputInterface $output)
+{
+if (!$this->strict && !$input->getOption('strict')) {
+return;
+}
+
+$this->resultInterpreter->registerResultInterpretation(new StrictInterpretation());
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Exception;
+
+
+
+
+
+
+interface TesterException
+{
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Exception;
+
+use Symfony\Component\DependencyInjection\Exception\RuntimeException;
+
+
+
+
+
+
+final class WrongPathsException extends RuntimeException implements TesterException
+{
+
+
+
+private $path;
+
+
+
+
+
+
+
+public function __construct($message, $path)
+{
+parent::__construct($message);
+
+$this->path = $path;
+}
+
+
+
+
+
+
+public function getPath()
+{
+return $this->path;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester;
+
+use Behat\Testwork\Specification\SpecificationIterator;
+use Behat\Testwork\Tester\Result\TestResult;
+use Behat\Testwork\Tester\Setup\Setup;
+use Behat\Testwork\Tester\Setup\Teardown;
+
+
+
+
+
+
+interface Exercise
+{
+
+
+
+
+
+
+
+
+public function setUp(array $iterators, $skip);
+
+
+
+
+
+
+
+
+
+public function test(array $iterators, $skip);
+
+
+
+
+
+
+
+
+
+
+public function tearDown(array $iterators, $skip, TestResult $result);
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result;
+
+use Exception;
+
+
+
+
+
+
+interface ExceptionResult extends TestResult
+{
+
+
+
+
+
+public function hasException();
+
+
+
+
+
+
+public function getException();
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result;
+
+
+
+
+
+
+final class IntegerTestResult implements TestResult
+{
+
+
+
+private $resultCode;
+
+
+
+
+
+
+public function __construct($resultCode)
+{
+$this->resultCode = $resultCode;
+}
+
+
+
+
+public function isPassed()
+{
+return self::PASSED == $this->getResultCode();
+}
+
+
+
+
+public function getResultCode()
+{
+return $this->resultCode;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result\Interpretation;
+
+use Behat\Testwork\Tester\Result\ResultInterpreter;
+use Behat\Testwork\Tester\Result\TestResult;
+
+
+
+
+
+
+
+
+interface ResultInterpretation
+{
+
+
+
+
+
+
+
+public function isFailure(TestResult $result);
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result\Interpretation;
+
+use Behat\Testwork\Tester\Result\TestResult;
+
+
+
+
+
+
+final class SoftInterpretation implements ResultInterpretation
+{
+
+
+
+public function isFailure(TestResult $result)
+{
+return TestResult::FAILED <= $result->getResultCode();
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result\Interpretation;
+
+use Behat\Testwork\Tester\Result\TestResult;
+
+
+
+
+
+
+final class StrictInterpretation implements ResultInterpretation
+{
+
+
+
+public function isFailure(TestResult $result)
+{
+return !$result->isPassed();
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result;
+
+use Behat\Testwork\Tester\Result\Interpretation\ResultInterpretation;
+
+
+
+
+
+
+final class ResultInterpreter
+{
+
+
+
+private $interpretations = array();
+
+
+
+
+
+
+public function registerResultInterpretation(ResultInterpretation $interpretation)
+{
+$this->interpretations[] = $interpretation;
+}
+
+
+
+
+
+
+
+
+public function interpretResult(TestResult $result)
+{
+foreach ($this->interpretations as $interpretation) {
+if ($interpretation->isFailure($result)) {
+return 1;
+}
+}
+
+return 0;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result;
+
+
+
+
+
+
+interface TestResult
+{
+const PASSED = 0;
+const SKIPPED = 10;
+const PENDING = 20;
+const FAILED = 99;
+
+
+
+
+
+
+public function isPassed();
+
+
+
+
+
+
+public function getResultCode();
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result;
+
+use ArrayIterator;
+use Countable;
+use IteratorAggregate;
+
+
+
+
+
+
+final class TestResults implements TestResult, Countable, IteratorAggregate
+{
+const NO_TESTS = -100;
+
+
+
+
+private $results;
+
+
+
+
+
+
+public function __construct(array $results = array())
+{
+$this->results = $results;
+}
+
+
+
+
+public function isPassed()
+{
+return self::PASSED == $this->getResultCode();
+}
+
+
+
+
+public function getResultCode()
+{
+$resultCode = static::NO_TESTS;
+foreach ($this->results as $result) {
+$resultCode = max($resultCode, $result->getResultCode());
+}
+
+return $resultCode;
+}
+
+
+
+
+public function count()
+{
+return count($this->results);
+}
+
+
+
+
+public function getIterator()
+{
+return new ArrayIterator($this->results);
+}
+
+
+
+
+
+
+public function toArray()
+{
+return $this->results;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Result;
+
+use Behat\Testwork\Tester\Setup\Setup;
+use Behat\Testwork\Tester\Setup\Teardown;
+
+
+
+
+
+
+final class TestWithSetupResult implements TestResult
+{
+
+
+
+private $setup;
+
+
+
+private $result;
+
+
+
+private $teardown;
+
+
+
+
+
+
+
+
+public function __construct(Setup $setup, TestResult $result, Teardown $teardown)
+{
+$this->setup = $setup;
+$this->result = $result;
+$this->teardown = $teardown;
+}
+
+
+
+
+public function isPassed()
+{
+return self::PASSED == $this->getResultCode();
+}
+
+
+
+
+public function getResultCode()
+{
+if (!$this->setup->isSuccessful()) {
+return self::FAILED;
+}
+
+if (!$this->teardown->isSuccessful()) {
+return self::FAILED;
+}
+
+return $this->result->getResultCode();
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Runtime;
+
+use Behat\Testwork\Environment\EnvironmentManager;
+use Behat\Testwork\Specification\GroupedSpecificationIterator;
+use Behat\Testwork\Tester\Exercise;
+use Behat\Testwork\Tester\Result\IntegerTestResult;
+use Behat\Testwork\Tester\Result\TestResult;
+use Behat\Testwork\Tester\Result\TestResults;
+use Behat\Testwork\Tester\Result\TestWithSetupResult;
+use Behat\Testwork\Tester\Setup\SuccessfulSetup;
+use Behat\Testwork\Tester\Setup\SuccessfulTeardown;
+use Behat\Testwork\Tester\SuiteTester;
+
+
+
+
+
+
+final class RuntimeExercise implements Exercise
+{
+
+
+
+private $envManager;
+
+
+
+private $suiteTester;
+
+
+
+
+
+
+
+public function __construct(EnvironmentManager $envManager, SuiteTester $suiteTester)
+{
+$this->envManager = $envManager;
+$this->suiteTester = $suiteTester;
+}
+
+
+
+
+public function setUp(array $iterators, $skip)
+{
+return new SuccessfulSetup();
+}
+
+
+
+
+public function test(array $iterators, $skip = false)
+{
+$results = array();
+foreach (GroupedSpecificationIterator::group($iterators) as $iterator) {
+$environment = $this->envManager->buildEnvironment($iterator->getSuite());
+
+$setup = $this->suiteTester->setUp($environment, $iterator, $skip);
+$localSkip = !$setup->isSuccessful() || $skip;
+$testResult = $this->suiteTester->test($environment, $iterator, $localSkip);
+$teardown = $this->suiteTester->tearDown($environment, $iterator, $localSkip, $testResult);
+
+$integerResult = new IntegerTestResult($testResult->getResultCode());
+$results[] = new TestWithSetupResult($setup, $integerResult, $teardown);
+}
+
+return new TestResults($results);
+}
+
+
+
+
+public function tearDown(array $iterators, $skip, TestResult $result)
+{
+return new SuccessfulTeardown();
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Runtime;
+
+use Behat\Testwork\Environment\Environment;
+use Behat\Testwork\Specification\SpecificationIterator;
+use Behat\Testwork\Tester\Result\IntegerTestResult;
+use Behat\Testwork\Tester\Result\TestResult;
+use Behat\Testwork\Tester\Result\TestResults;
+use Behat\Testwork\Tester\Result\TestWithSetupResult;
+use Behat\Testwork\Tester\Setup\SuccessfulSetup;
+use Behat\Testwork\Tester\Setup\SuccessfulTeardown;
+use Behat\Testwork\Tester\SpecificationTester;
+use Behat\Testwork\Tester\SuiteTester;
+
+
+
+
+
+
+final class RuntimeSuiteTester implements SuiteTester
+{
+
+
+
+private $specTester;
+
+
+
+
+
+
+public function __construct(SpecificationTester $specTester)
+{
+$this->specTester = $specTester;
+}
+
+
+
+
+public function setUp(Environment $env, SpecificationIterator $iterator, $skip)
+{
+return new SuccessfulSetup();
+}
+
+
+
+
+public function test(Environment $env, SpecificationIterator $iterator, $skip = false)
+{
+$results = array();
+foreach ($iterator as $specification) {
+$setup = $this->specTester->setUp($env, $specification, $skip);
+$localSkip = !$setup->isSuccessful() || $skip;
+$testResult = $this->specTester->test($env, $specification, $localSkip);
+$teardown = $this->specTester->tearDown($env, $specification, $localSkip, $testResult);
+
+$integerResult = new IntegerTestResult($testResult->getResultCode());
+$results[] = new TestWithSetupResult($setup, $integerResult, $teardown);
+}
+
+return new TestResults($results);
+}
+
+
+
+
+public function tearDown(Environment $env, SpecificationIterator $iterator, $skip, TestResult $result)
+{
+return new SuccessfulTeardown();
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\ServiceContainer;
+
+use Behat\Testwork\Cli\ServiceContainer\CliExtension;
+use Behat\Testwork\Environment\ServiceContainer\EnvironmentExtension;
+use Behat\Testwork\ServiceContainer\Extension;
+use Behat\Testwork\ServiceContainer\ExtensionManager;
+use Behat\Testwork\ServiceContainer\ServiceProcessor;
+use Behat\Testwork\Specification\ServiceContainer\SpecificationExtension;
+use Behat\Testwork\Suite\ServiceContainer\SuiteExtension;
+use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\Reference;
+
+
+
+
+
+
+abstract class TesterExtension implements Extension
+{
+
+
+
+const EXERCISE_ID = 'tester.exercise';
+const SUITE_TESTER_ID = 'tester.suite';
+const SPECIFICATION_TESTER_ID = 'tester.specification';
+const RESULT_INTERPRETER_ID = 'tester.result.interpreter';
+
+
+
+
+const EXERCISE_WRAPPER_TAG = 'tester.exercise.wrapper';
+const SUITE_TESTER_WRAPPER_TAG = 'tester.suite.wrapper';
+const SPECIFICATION_TESTER_WRAPPER_TAG = 'tester.specification.wrapper';
+const RESULT_INTERPRETATION_TAG = 'test.result.interpretation';
+
+
+
+
+private $processor;
+
+
+
+
+
+
+public function __construct(ServiceProcessor $processor = null)
+{
+$this->processor = $processor ? : new ServiceProcessor();
+}
+
+
+
+
+public function getConfigKey()
+{
+return 'testers';
+}
+
+
+
+
+public function initialize(ExtensionManager $extensionManager)
+{
+}
+
+
+
+
+public function configure(ArrayNodeDefinition $builder)
+{
+$builder
+->addDefaultsIfNotSet()
+->children()
+->booleanNode('strict')
+->info('Sets the strict mode for result interpretation')
+->defaultFalse()
+->end()
+->booleanNode('skip')
+->info('Tells tester to skip all tests')
+->defaultFalse()
+->end()
+->end()
+;
+}
+
+
+
+
+public function load(ContainerBuilder $container, array $config)
+{
+$this->loadExerciseController($container, $config['skip']);
+$this->loadStrictController($container, $config['strict']);
+$this->loadResultInterpreter($container);
+$this->loadExercise($container);
+$this->loadSuiteTester($container);
+$this->loadSpecificationTester($container);
+}
+
+
+
+
+public function process(ContainerBuilder $container)
+{
+$this->processExerciseWrappers($container);
+$this->processSuiteTesterWrappers($container);
+$this->processSpecificationTesterWrappers($container);
+$this->processResultInterpretations($container);
+}
+
+
+
+
+
+
+
+protected function loadExerciseController(ContainerBuilder $container, $skip = false)
+{
+$definition = new Definition('Behat\Testwork\Tester\Cli\ExerciseController', array(
+new Reference(SuiteExtension::REGISTRY_ID),
+new Reference(SpecificationExtension::FINDER_ID),
+new Reference(self::EXERCISE_ID),
+new Reference(self::RESULT_INTERPRETER_ID),
+$skip
+));
+$definition->addTag(CliExtension::CONTROLLER_TAG, array('priority' => 0));
+$container->setDefinition(CliExtension::CONTROLLER_TAG . '.exercise', $definition);
+}
+
+
+
+
+
+
+
+protected function loadStrictController(ContainerBuilder $container, $strict = false)
+{
+$definition = new Definition('Behat\Testwork\Tester\Cli\StrictController', array(
+new Reference(self::RESULT_INTERPRETER_ID),
+$strict
+));
+$definition->addTag(CliExtension::CONTROLLER_TAG, array('priority' => 300));
+$container->setDefinition(CliExtension::CONTROLLER_TAG . '.strict', $definition);
+}
+
+
+
+
+
+
+protected function loadResultInterpreter(ContainerBuilder $container)
+{
+$definition = new Definition('Behat\Testwork\Tester\Result\ResultInterpreter');
+$container->setDefinition(self::RESULT_INTERPRETER_ID, $definition);
+
+$definition = new Definition('Behat\Testwork\Tester\Result\Interpretation\SoftInterpretation');
+$definition->addTag(self::RESULT_INTERPRETATION_TAG);
+$container->setDefinition(self::RESULT_INTERPRETATION_TAG . '.soft', $definition);
+}
+
+
+
+
+
+
+protected function loadExercise(ContainerBuilder $container)
+{
+$definition = new Definition('Behat\Testwork\Tester\Runtime\RuntimeExercise', array(
+new Reference(EnvironmentExtension::MANAGER_ID),
+new Reference(self::SUITE_TESTER_ID)
+));
+$container->setDefinition(self::EXERCISE_ID, $definition);
+}
+
+
+
+
+
+
+protected function loadSuiteTester(ContainerBuilder $container)
+{
+$definition = new Definition('Behat\Testwork\Tester\Runtime\RuntimeSuiteTester', array(
+new Reference(self::SPECIFICATION_TESTER_ID)
+));
+$container->setDefinition(self::SUITE_TESTER_ID, $definition);
+}
+
+
+
+
+
+
+abstract protected function loadSpecificationTester(ContainerBuilder $container);
+
+
+
+
+
+
+protected function processExerciseWrappers(ContainerBuilder $container)
+{
+$this->processor->processWrapperServices($container, self::EXERCISE_ID, self::EXERCISE_WRAPPER_TAG);
+}
+
+
+
+
+
+
+protected function processSuiteTesterWrappers(ContainerBuilder $container)
+{
+$this->processor->processWrapperServices($container, self::SUITE_TESTER_ID, self::SUITE_TESTER_WRAPPER_TAG);
+}
+
+
+
+
+
+
+protected function processSpecificationTesterWrappers(ContainerBuilder $container)
+{
+$this->processor->processWrapperServices($container, self::SPECIFICATION_TESTER_ID, self::SPECIFICATION_TESTER_WRAPPER_TAG);
+}
+
+
+
+
+
+
+protected function processResultInterpretations(ContainerBuilder $container)
+{
+$references = $this->processor->findAndSortTaggedServices($container, self::RESULT_INTERPRETATION_TAG);
+$definition = $container->getDefinition(self::RESULT_INTERPRETER_ID);
+
+foreach ($references as $reference) {
+$definition->addMethodCall('registerResultInterpretation', array($reference));
+}
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Setup;
+
+
+
+
+
+
+final class FailedSetup implements Setup
+{
+
+
+
+public function isSuccessful()
+{
+return false;
+}
+
+
+
+
+public function hasOutput()
+{
+return false;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Setup;
+
+
+
+
+
+
+final class FailedTeardown implements Teardown
+{
+
+
+
+public function isSuccessful()
+{
+return false;
+}
+
+
+
+
+public function hasOutput()
+{
+return false;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Setup;
+
+
+
+
+
+
+interface Setup
+{
+
+
+
+
+
+public function isSuccessful();
+
+
+
+
+
+
+public function hasOutput();
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Setup;
+
+
+
+
+
+
+final class SuccessfulSetup implements Setup
+{
+
+
+
+public function isSuccessful()
+{
+return true;
+}
+
+
+
+
+public function hasOutput()
+{
+return false;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Setup;
+
+
+
+
+
+
+final class SuccessfulTeardown implements Teardown
+{
+
+
+
+public function isSuccessful()
+{
+return true;
+}
+
+
+
+
+public function hasOutput()
+{
+return false;
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester\Setup;
+
+
+
+
+
+
+interface Teardown
+{
+
+
+
+
+
+public function isSuccessful();
+
+
+
+
+
+
+public function hasOutput();
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester;
+
+use Behat\Testwork\Environment\Environment;
+use Behat\Testwork\Tester\Result\TestResult;
+use Behat\Testwork\Tester\Setup\Setup;
+use Behat\Testwork\Tester\Setup\Teardown;
+
+
+
+
+
+
+interface SpecificationTester
+{
+
+
+
+
+
+
+
+
+
+public function setUp(Environment $env, $spec, $skip);
+
+
+
+
+
+
+
+
+
+
+public function test(Environment $env, $spec, $skip);
+
+
+
+
+
+
+
+
+
+
+
+public function tearDown(Environment $env, $spec, $skip, TestResult $result);
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Tester;
+
+use Behat\Testwork\Environment\Environment;
+use Behat\Testwork\Specification\SpecificationIterator;
+use Behat\Testwork\Tester\Result\TestResult;
+use Behat\Testwork\Tester\Setup\Setup;
+use Behat\Testwork\Tester\Setup\Teardown;
+
+
+
+
+
+
+interface SuiteTester
+{
+
+
+
+
+
+
+
+
+
+public function setUp(Environment $env, SpecificationIterator $iterator, $skip);
+
+
+
+
+
+
+
+
+
+
+public function test(Environment $env, SpecificationIterator $iterator, $skip);
+
+
+
+
+
+
+
+
+
+
+
+public function tearDown(Environment $env, SpecificationIterator $iterator, $skip, TestResult $result);
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Translator\Cli;
+
+use Behat\Testwork\Cli\Controller;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Translation\Translator;
+
+
+
+
+
+
+final class LanguageController implements Controller
+{
+
+
+
+private $translator;
+
+
+
+
+
+
+public function __construct(Translator $translator)
+{
+$this->translator = $translator;
+}
+
+
+
+
+public function configure(Command $command)
+{
+$command->addOption('--lang', null, InputOption::VALUE_REQUIRED,
+'Print output in particular language.'
+);
+}
+
+
+
+
+public function execute(InputInterface $input, OutputInterface $output)
+{
+if (!$input->getOption('lang')) {
+return;
+}
+
+$this->translator->setLocale($input->getOption('lang'));
+}
+}
+<?php
+
+
+
+
+
+
+
+
+
+namespace Behat\Testwork\Translator\ServiceContainer;
+
+use Behat\Testwork\Cli\ServiceContainer\CliExtension;
+use Behat\Testwork\ServiceContainer\Extension;
+use Behat\Testwork\ServiceContainer\ExtensionManager;
+use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\Reference;
+
+
+
+
+
+
+final class TranslatorExtension implements Extension
+{
+
+
+
+const TRANSLATOR_ID = 'translator';
+
+
+
+
+public function getConfigKey()
+{
+return 'translation';
+}
+
+
+
+
+public function initialize(ExtensionManager $extensionManager)
+{
+}
+
+
+
+
+public function configure(ArrayNodeDefinition $builder)
+{
+$defaultLanguage = $this->getDefaultLanguage() ?: 'en';
+
+$builder
+->addDefaultsIfNotSet()
+->children()
+->scalarNode('locale')
+->info('Sets output locale for the tester')
+->defaultValue($defaultLanguage)
+->end()
+->scalarNode('fallback_locale')
+->info('Sets fallback output locale for the tester')
+->defaultValue('en')
+->end()
+->end();
+}
+
+
+
+
+public function load(ContainerBuilder $container, array $config)
+{
+$this->loadTranslator($container, $config['locale'], $config['fallback_locale']);
+$this->loadController($container);
+}
+
+
+
+
+public function process(ContainerBuilder $container)
+{
+}
+
+
+
+
+
+
+
+
+private function loadTranslator(ContainerBuilder $container, $locale, $fallbackLocale)
+{
+$definition = new Definition('Symfony\Component\Translation\Translator', array($locale));
+$container->setDefinition(self::TRANSLATOR_ID, $definition);
+
+$definition->addMethodCall('setFallbackLocales', array(array($fallbackLocale)));
+$definition->addMethodCall(
+'addLoader', array(
+'xliff',
+new Definition('Symfony\Component\Translation\Loader\XliffFileLoader')
+)
+);
+$definition->addMethodCall(
+'addLoader', array(
+'yaml',
+new Definition('Symfony\Component\Translation\Loader\YamlFileLoader')
+)
+);
+$definition->addMethodCall(
+'addLoader', array(
+'php',
+new Definition('Symfony\Component\Translation\Loader\PhpFileLoader')
+)
+);
+$definition->addMethodCall(
+'addLoader', array(
+'array',
+new Definition('Symfony\Component\Translation\Loader\ArrayLoader')
+)
+);
+$container->setDefinition(self::TRANSLATOR_ID, $definition);
+}
+
+
+
+
+
+
+private function loadController(ContainerBuilder $container)
+{
+$definition = new Definition('Behat\Testwork\Translator\Cli\LanguageController', array(
+new Reference(self::TRANSLATOR_ID)
+));
+$definition->addTag(CliExtension::CONTROLLER_TAG, array('priority' => 800));
+$container->setDefinition(CliExtension::CONTROLLER_TAG . '.translator', $definition);
+}
+
+
+
+
+
+
+private function getDefaultLanguage()
+{
+$defaultLanguage = null;
+if (($locale = getenv('LANG')) && preg_match('/^([a-z]{2})/', $locale, $matches)) {
+$defaultLanguage = $matches[1];
+
+return $defaultLanguage;
+}
+
+return $defaultLanguage;
+}
+}
+Copyright (c) 2016 Konstantin Kudryashov <ever.zet@gmail.com>
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+<?php return array(
+'en' => array(
+'snippet_context_choice' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> suite has undefined steps. Please choose the context to generate snippets:</snippet_undefined>',
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> has missing steps. Define them with these snippets:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Use <snippet_keyword>--snippets-for</snippet_keyword> CLI option to generate snippets for following <snippet_keyword>%1%</snippet_keyword> suite steps:</snippet_undefined>',
+'skipped_scenarios_title' => 'Skipped scenarios:',
+'failed_scenarios_title' => 'Failed scenarios:',
+'failed_hooks_title' => 'Failed hooks:',
+'failed_steps_title' => 'Failed steps:',
+'pending_steps_title' => 'Pending steps:',
+'scenarios_count' => '{0} No scenarios|{1} 1 scenario|]1,Inf] %1% scenarios',
+'steps_count' => '{0} No steps|{1} 1 step|]1,Inf] %1% steps',
+'passed_count' => '[1,Inf] %1% passed',
+'failed_count' => '[1,Inf] %1% failed',
+'pending_count' => '[1,Inf] %1% pending',
+'undefined_count' => '[1,Inf] %1% undefined',
+'skipped_count' => '[1,Inf] %1% skipped',
+),
+'cs' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> obsahuje chybnÃ© kroky. Definujte je za pouÅ¾itÃ­ nÃ¡sledujÃ­cÃ­ho kÃ³du:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Snippety pro nÃ¡sledujÃ­cÃ­ kroky v sadÄ› <snippet_keyword>%1%</snippet_keyword> nebyly vygenerovÃ¡ny (zkontrolujte sprÃ¡vnost konfigurace):</snippet_undefined>',
+'failed_scenarios_title' => 'ChybnÃ© scÃ©nÃ¡Å™e:',
+'failed_hooks_title' => 'ChybnÃ© hooky:',
+'failed_steps_title' => 'ChybnÃ© kroky:',
+'pending_steps_title' => 'ÄŒekajÃ­cÃ­ kroky:',
+'scenarios_count' => '{0} Å½Ã¡dnÃ½ scÃ©nÃ¡Å™|{1} 1 scÃ©nÃ¡Å™|{2,3,4} %1% scÃ©nÃ¡Å™e|]4,Inf] %1% scÃ©nÃ¡Å™Å¯',
+'steps_count' => '{0} Å½Ã¡dnÃ© kroky|{1} 1 krok|{2,3,4} %1% kroky|]4,Inf] %1% krokÅ¯',
+'passed_count' => '{1} %1% proÅ¡el|{2,3,4} %1% proÅ¡ly|]4,Inf] %1% proÅ¡lo',
+'failed_count' => '{1} %1% selhal|{2,3,4} %1% selhaly|]4,Inf] %1% selhalo',
+'pending_count' => '{1} %1% ÄekÃ¡|{2,3,4} %1% ÄekajÃ­|]4,Inf] %1% ÄekÃ¡',
+'undefined_count' => '{1} %1% nedefinovÃ¡n|{2,3,4} %1% nedefinovÃ¡ny|]4,Inf] %1% nedefinovÃ¡no',
+'skipped_count' => '{1} %1% pÅ™eskoÄen|{2,3,4} %1% pÅ™eskoÄeny|]4,Inf] %1% pÅ™eskoÄeno',
+),
+'de' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> hat fehlende Schritte. Definiere diese mit den folgenden Snippets:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Snippets fÃ¼r die folgenden Schritte in der <snippet_keyword>%1%</snippet_keyword> Suite wurden nicht generiert (Konfiguration Ã¼berprÃ¼fen):</snippet_undefined>',
+'failed_scenarios_title' => 'Fehlgeschlagene Szenarien:',
+'failed_hooks_title' => 'Fehlgeschlagene Hooks:',
+'failed_steps_title' => 'Fehlgeschlagene Schritte:',
+'pending_steps_title' => 'Ausstehende Schritte:',
+'scenarios_count' => '{0} Kein Szenario|{1} 1 Szenario|]1,Inf] %1% Szenarien',
+'steps_count' => '{0} Kein Schritt|{1} 1 Schritt|]1,Inf] %1% Schritte',
+'passed_count' => '[1,Inf] %1% bestanden',
+'failed_count' => '[1,Inf] %1% fehlgeschlagen',
+'pending_count' => '[1,Inf] %1% ausstehend',
+'undefined_count' => '[1,Inf] %1% nicht definiert',
+'skipped_count' => '[1,Inf] %1% Ã¼bersprungen',
+),
+'es' => array(
+'snippet_proposal_title' => '<snippet_undefined>A <snippet_keyword>%1%</snippet_keyword> le faltan pasos. DefÃ­nelos con estos pasos:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Las plantillas para los siguientes pasos en <snippet_keyword>%1%</snippet_keyword> no fueron generadas (revisa tu configuraciÃ³n):</snippet_undefined>',
+'failed_scenarios_title' => 'Escenarios fallidos:',
+'failed_hooks_title' => 'Hooks fallidos:',
+'failed_steps_title' => 'Pasos fallidos:',
+'pending_steps_title' => 'Pasos pendientes:',
+'scenarios_count' => '{0} NingÃºn escenario|{1} 1 escenario|]1,Inf] %1% escenarios',
+'steps_count' => '{0} NingÃºn paso|{1} 1 paso|]1,Inf] %1% pasos',
+'passed_count' => '[1,Inf] %1% pasaron',
+'failed_count' => '[1,Inf] %1% fallaron',
+'pending_count' => '[1,Inf] %1% pendientes',
+'undefined_count' => '[1,Inf] %1% por definir',
+'skipped_count' => '[1,Inf] %1% saltadas',
+),
+'fr' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> a des Ã©tapes manquantes. DÃ©finissez-les avec les modÃ¨les suivants :</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Les modÃ¨les des Ã©tapes de la suite <snippet_keyword>%1%</snippet_keyword> n\'ont pas Ã©tÃ© gÃ©nÃ©rÃ©s (vÃ©rifiez votre configuration):</snippet_undefined>',
+'failed_scenarios_title' => 'ScÃ©narios Ã©chouÃ©s:',
+'failed_hooks_title' => 'Hooks Ã©chouÃ©s:',
+'failed_steps_title' => 'Etapes Ã©chouÃ©es:',
+'pending_steps_title' => 'Etapes en attente:',
+'scenarios_count' => '{0} Pas de scÃ©nario|{1} 1 scÃ©nario|]1,Inf] %1% scÃ©narios',
+'steps_count' => '{0} Pas d\'Ã©tape|{1} 1 Ã©tape|]1,Inf] %1% Ã©tapes',
+'passed_count' => '[1,Inf] %1% succÃ¨s',
+'failed_count' => '[1,Inf] %1% Ã©checs',
+'pending_count' => '[1,Inf] %1% en attente',
+'undefined_count' => '[1,Inf] %1% indÃ©finis',
+'skipped_count' => '[1,Inf] %1% ignorÃ©s',
+),
+'it' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> ha dei passaggi mancanti. Definiscili con questi snippet:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Gli snippet per i seguenti passaggi della suite <snippet_keyword>%1%</snippet_keyword> non sono stati generati (verifica la configurazione):</snippet_undefined>',
+'failed_scenarios_title' => 'Scenari falliti:',
+'failed_hooks_title' => 'Hook falliti:',
+'failed_steps_title' => 'Passaggi falliti:',
+'pending_steps_title' => 'Passaggi in sospeso:',
+'scenarios_count' => '{0} Nessuno scenario|{1} 1 scenario|]1,Inf] %1% scenari',
+'steps_count' => '{0} Nessun passaggio|{1} 1 passaggio|]1,Inf] %1% passaggi',
+'passed_count' => '{1} 1 superato|]1,Inf] %1% superati',
+'failed_count' => '{1} 1 fallito|]1,Inf] %1% falliti',
+'pending_count' => '[1,Inf] %1% in sospeso',
+'undefined_count' => '{1} 1 non definito|]1,Inf] %1% non definiti',
+'skipped_count' => '{1} 1 ignorato|]1,Inf] %1% ignorati',
+),
+'ja' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> ã®ã‚¹ãƒ†ãƒƒãƒ—ãŒè¦‹ã¤ã‹ã‚Šã¾ã›ã‚“ã€‚ æ¬¡ã®ã‚¹ãƒ‹ãƒšãƒƒãƒˆã§å®šç¾©ã§ãã¾ã™:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>ä»¥ä¸‹ã®ã‚¹ãƒ†ãƒƒãƒ—ã®ã‚¹ãƒ‹ãƒšãƒƒãƒˆã¯<snippet_keyword>%1%</snippet_keyword>ã‚¹ã‚¤ãƒ¼ãƒˆã«ç”Ÿæˆã•ã‚Œã¾ã›ã‚“ã§ã—ãŸ(è¨­å®šã‚’ç¢ºèªã—ã¦ãã ã•ã„):</snippet_undefined>',
+'skipped_scenarios_title' => 'ã‚¹ã‚­ãƒƒãƒ—ã—ãŸ ã‚·ãƒŠãƒªã‚ª:',
+'failed_scenarios_title' => 'å¤±æ•—ã—ãŸ ã‚·ãƒŠãƒªã‚ª:',
+'failed_hooks_title' => 'å¤±æ•—ã—ãŸ ãƒ•ãƒƒã‚¯:',
+'failed_steps_title' => 'å¤±æ•—ã—ãŸ ã‚¹ãƒ†ãƒƒãƒ—:',
+'pending_steps_title' => 'ä¿ç•™ä¸­ã®ã‚¹ãƒ†ãƒƒãƒ—:',
+'scenarios_count' => '{0} No scenarios|{1} 1 å€‹ã®ã‚·ãƒŠãƒªã‚ª|]1,Inf] %1% å€‹ã®ã‚·ãƒŠãƒªã‚ª',
+'steps_count' => '{0} ã‚¹ãƒ†ãƒƒãƒ—ãŒã‚ã‚Šã¾ã›ã‚“|{1} 1 å€‹ã®ã‚¹ãƒ†ãƒƒãƒ—|]1,Inf] %1% å€‹ã®ã‚¹ãƒ†ãƒƒãƒ—',
+'passed_count' => '[1,Inf] %1% å€‹æˆåŠŸ',
+'failed_count' => '[1,Inf] %1% å€‹å¤±æ•—',
+'pending_count' => '[1,Inf] %1% å€‹ä¿ç•™',
+'undefined_count' => '[1,Inf] %1% å€‹æœªå®šç¾©',
+'skipped_count' => '[1,Inf] %1% å€‹ã‚¹ã‚­ãƒƒãƒ—',
+),
+'nl' => array(
+'snippet_proposal_title' => '<snippet_undefined>Ontbrekende stappen in <snippet_keyword>%1%</snippet_keyword>. Definieer ze met de volgende fragmenten:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Fragmenten voor de volgende stappen in de <snippet_keyword>%1%</snippet_keyword> suite werden niet gegenereerd (controleer de configuratie):</snippet_undefined>',
+'failed_scenarios_title' => 'Gefaalde scenario\'s:',
+'failed_hooks_title' => 'Gefaalde hooks:',
+'failed_steps_title' => 'Gefaalde stappen:',
+'pending_steps_title' => 'Onafgewerkte stappen:',
+'scenarios_count' => '{0} Geen scenario\'s|{1} 1 scenario|]1,Inf] %1% scenario\'s',
+'steps_count' => '{0} Geen stappen|{1} 1 stap|]1,Inf] %1% stappen',
+'passed_count' => '[1,Inf] %1% geslaagd',
+'failed_count' => '[1,Inf] %1% gefaald',
+'pending_count' => '[1,Inf] %1% wachtende',
+'undefined_count' => '[1,Inf] %1% niet gedefinieerd',
+'skipped_count' => '[1,Inf] %1% overgeslagen',
+),
+'no' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> mangler steg. Definer dem med disse snuttene:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Snutter for de fÃ¸lgende stegene i <snippet_keyword>%1%</snippet_keyword>-samlingen ble ikke laget. (Sjekk konfigurasjonen din.):</snippet_undefined>',
+'failed_scenarios_title' => 'Feilende scenarier:',
+'failed_hooks_title' => 'Feilende hooks:',
+'failed_steps_title' => 'Feilende steg:',
+'pending_steps_title' => 'Ikke implementerte steg:',
+'scenarios_count' => '{0} Ingen scenarier|{1} 1 scenario|]1,Inf] %1% scenarier',
+'steps_count' => '{0} Ingen steg|{1} 1 steg|]1,Inf] %1% steg',
+'passed_count' => '[1,Inf] %1% ok',
+'failed_count' => '[1,Inf] %1% feilet',
+'pending_count' => '[1,Inf] %1% ikke implementert',
+'undefined_count' => '[1,Inf] %1% ikke definert',
+'skipped_count' => '[1,Inf] %1% hoppet over',
+),
+'pl' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> zawiera brakujÄ…ce kroki. UtwÃ³rz je korzystajÄ…c z tych fragmentÃ³w kodu:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Fragmenty kodu dla nastÄ™pujÄ…cych krokÃ³w <snippet_keyword>%1%</snippet_keyword> nie zostaÅ‚y wygenerowane (sprawdÅº swojÄ… konfiguracjÄ™):</snippet_undefined>',
+'failed_scenarios_title' => 'Nieudane scenariusze:',
+'failed_hooks_title' => 'Nieudane hooki:',
+'failed_steps_title' => 'Nieudane kroki',
+'pending_steps_title' => 'OczekujÄ…ce kroki',
+'scenarios_count' => '{0} Brak scenariuszy|{1} 1 scenariusz|{2,3,4,22,23,24,32,33,34,42,43,44} %1% scenariusze|]4,Inf] %1% scenariuszy',
+'steps_count' => '{0} Brak krokÃ³w|{1} 1 krok|{2,3,4,22,23,24,32,33,34,42,43,44} %1% kroki|]4,Inf] %1% krokÃ³w',
+'passed_count' => '{1} %1% udany|{2,3,4,22,23,24,32,33,34,42,43,44} %1% udane|]4,Inf] %1% udanych',
+'failed_count' => '{1} %1% nieudany|{2,3,4,22,23,24,32,33,34,42,43,44} %1% nieudane|]4,Inf] %1% nieudanych',
+'pending_count' => '{1} %1% oczekujÄ…cy|{2,3,4,22,23,24,32,33,34,42,43,44} %1% oczekujÄ…ce|]4,Inf] %1% oczekujÄ…cych',
+'undefined_count' => '{1} %1% niezdefiniowany|{2,3,4,22,23,24,32,33,34,42,43,44} %1% niezdefiniowane|]4,Inf] %1% niezdefiniowanych',
+'skipped_count' => '{1} %1% pominiÄ™ty|{2,3,4,22,23,24,32,33,34,42,43,44} %1% pominiÄ™te|]4,Inf] %1% pominiÄ™tych',
+),
+'pt' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> contÃ©m definiÃ§Ãµes em falta. Defina-as com estes exemplos:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Os exemplos para as seguintes definiÃ§Ãµes da suite <snippet_keyword>%1%</snippet_keyword> nÃ£o foram gerados (verifique a configuraÃ§Ã£o):</snippet_undefined>',
+'failed_scenarios_title' => 'CenÃ¡rios que falharam:',
+'failed_hooks_title' => 'Hooks que falharam:',
+'failed_steps_title' => 'DefiniÃ§Ãµes que falharam:',
+'pending_steps_title' => 'DefiniÃ§Ãµes por definir:',
+'scenarios_count' => '{0} Nenhum cenÃ¡rio|{1} 1 cenÃ¡rio|]1,Inf] %1% cenÃ¡rios',
+'steps_count' => '{0} Nenhuma definiÃ§Ã£o|{1} 1 definiÃ§Ã£o|]1,Inf] %1% definiÃ§Ãµes',
+'passed_count' => '{1} passou|]1,Inf] %1% passaram',
+'failed_count' => '{1} falhou|]1,Inf] %1% falharam',
+'pending_count' => '[1,Inf] %1% por definir',
+'undefined_count' => '{1} indefinido|]1,Inf] %1% indefinidos',
+'skipped_count' => '{1} omitido|]1,Inf] %1% omitidos',
+),
+'pt-BR' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> possue etapas faltando. Defina elas com esse(s) trecho(s) de cÃ³digo:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Trecho de cÃ³digos para as seguintes etapas em <snippet_keyword>%1%</snippet_keyword> suite nÃ£o foram geradas (verique sua configuraÃ§Ã£o):</snippet_undefined>',
+'failed_scenarios_title' => 'CenÃ¡rios falhados:',
+'failed_hooks_title' => 'Hooks falhados:',
+'failed_steps_title' => 'Etapas falhadas:',
+'pending_steps_title' => 'Etapas pendentes:',
+'scenarios_count' => '{0} Nenhum cenÃ¡rio|{1} 1 cenÃ¡rio|]1,Inf] %1% cenÃ¡rios',
+'steps_count' => '{0} Nenhuma etapa|{1} 1 etapa|]1,Inf] %1% etapas',
+'passed_count' => '[1,Inf] %1% passou',
+'failed_count' => '[1,Inf] %1% falhou',
+'pending_count' => '[1,Inf] %1% pendente',
+'undefined_count' => '[1,Inf] %1% indefinido',
+'skipped_count' => '[1,Inf] %1% pulado',
+),
+'ro' => array(
+'snippet_proposal_title' => '<snippet_undefined><snippet_keyword>%1%</snippet_keyword> are paÈ™i lipsa. PuteÈ›i implementa paÈ™ii cu ajutorul acestor fragmente de cod:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Fragmentele de cod pentru urmatorii paÈ™i din suita <snippet_keyword>%1%</snippet_keyword> nu au fost generate (contextul tau implementeaza interfata SnippetAcceptingContext?):</snippet_undefined>',
+'skipped_scenarios_title' => 'Scenarii omise:',
+'failed_scenarios_title' => 'Scenarii eÈ™uate:',
+'failed_hooks_title' => 'Hook-uri eÈ™uate:',
+'failed_steps_title' => 'PaÈ™i esuaÈ›i:',
+'pending_steps_title' => 'PaÈ™i in aÈ™teptare:',
+'scenarios_count' => '{0} Niciun scenariu|{1} 1 scenariu|]1,Inf] %1% scenarii',
+'steps_count' => '{0} Niciun pas|{1} 1 pas|]1,Inf] %1% pasi',
+'passed_count' => '[1,Inf] %1% cu succes',
+'failed_count' => '[1,Inf] %1% fara success',
+'pending_count' => '[1,Inf] %1% in aÈ™teptare',
+'undefined_count' => '[1,Inf] %1% fara implementare',
+'skipped_count' => '{1} %1% omis|]1,Inf] %1% omiÈ™i',
+),
+'ru' => array(
+'snippet_proposal_title' => '<snippet_keyword>%1%</snippet_keyword> <snippet_undefined>Ğ½Ğµ ÑĞ¾Ğ´ĞµÑ€Ğ¶Ğ¸Ñ‚ Ğ½ĞµĞ¾Ğ±Ñ…Ğ¾Ğ´Ğ¸Ğ¼Ñ‹Ñ… Ğ¾Ğ¿Ñ€ĞµĞ´ĞµĞ»ĞµĞ½Ğ¸Ğ¹. Ğ’Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ´Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ¸Ñ… Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒÑ ÑˆĞ°Ğ±Ğ»Ğ¾Ğ½Ñ‹:</snippet_undefined>',
+'snippet_missing_title' => '<snippet_undefined>Ğ¨Ğ°Ğ±Ğ»Ğ¾Ğ½Ñ‹ Ğ´Ğ»Ñ ÑĞ»ĞµĞ´ÑƒÑÑ‰Ğ¸Ñ… ÑˆĞ°Ğ³Ğ¾Ğ² Ğ² ÑÑ€ĞµĞ´Ğµ <snippet_keyword>%1%</snippet_keyword> Ğ½Ğµ Ğ±Ñ‹Ğ»Ğ¸ ÑĞ³ĞµĞ½ĞµÑ€Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ñ‹ (Ğ¿Ñ€Ğ¾Ğ²ĞµÑ€ÑŒÑ‚Ğµ Ğ²Ğ°ÑˆĞ¸ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸):</snippet_undefined>',
+'skipped_scenarios_title' => 'ĞŸÑ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ½Ñ‹Ğµ ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¸:',
+'failed_scenarios_title' => 'ĞŸÑ€Ğ¾Ğ²Ğ°Ğ»ĞµĞ½Ğ½Ñ‹Ğµ ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¸:',
+'failed_hooks_title' => 'ĞŸÑ€Ğ¾Ğ²Ğ°Ğ»ĞµĞ½Ğ½Ñ‹Ğµ Ñ…ÑƒĞºĞ¸:',
+'failed_steps_title' => 'ĞŸÑ€Ğ¾Ğ²Ğ°Ğ»ĞµĞ½Ğ½Ñ‹Ğµ ÑˆĞ°Ğ³Ğ¸:',
+'pending_steps_title' => 'Ğ¨Ğ°Ğ³Ğ¸ Ğ² Ğ¾Ğ¶Ğ¸Ğ´Ğ°Ğ½Ğ¸Ğ¸:',
+'scenarios_count' => '{0} ĞĞµÑ‚ ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸ĞµĞ²|{1,21,31} %1% ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸Ğ¹|{2,3,4,22,23,24} %1% ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸Ñ|]4,Inf] %1% ÑÑ†ĞµĞ½Ğ°Ñ€Ğ¸ĞµĞ²',
+'steps_count' => '{0} ĞĞµÑ‚ ÑˆĞ°Ğ³Ğ¾Ğ²|{1,21,31} %1% ÑˆĞ°Ğ³|{2,3,4,22,23,24} %1% ÑˆĞ°Ğ³Ğ°|]4,Inf] %1% ÑˆĞ°Ğ³Ğ¾Ğ²',
+'passed_count' => '{1,21,31} %1% Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½|]1,Inf] %1% Ğ¿Ñ€Ğ¾Ğ¹Ğ´ĞµĞ½Ğ¾',
+'failed_count' => '{1,21,31} %1% Ğ¿Ñ€Ğ¾Ğ²Ğ°Ğ»ĞµĞ½|]1,Inf] %1% Ğ¿Ñ€Ğ¾Ğ²Ğ°Ğ»ĞµĞ½Ğ¾',
+'pending_count' => '[1,Inf] %1% Ğ² Ğ¾Ğ¶Ğ¸Ğ´Ğ°Ğ½Ğ¸Ğ¸',
+'undefined_count' => '{1,21,31} %1% Ğ½Ğµ Ğ¾Ğ¿Ñ€ĞµĞ´ĞµĞ»ĞµĞ½|]1,Inf] %1% Ğ½Ğµ Ğ¾Ğ¿Ñ€ĞµĞ´ĞµĞ»ĞµĞ½Ğ¾',
+'skipped_count' => '{1,21,31} %1% Ğ¿Ñ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½|]1,Inf] %1% Ğ¿Ñ€Ğ¾Ğ¿ÑƒÑ‰ĞµĞ½Ğ¾',
+),
+);
+<?php
+
+/*
+ * This file is part of the Behat.
+ * (c) Konstantin Kudryashov <ever.zet@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
+define('BEHAT_BIN_PATH',     __FILE__);
+
+if (is_file($autoload = getcwd() . '/vendor/autoload.php')) {
+    require $autoload;
+}
+
+if (!class_exists('Behat\Behat\ApplicationFactory', true)) {
+    if (is_file($autoload = __DIR__ . '/../vendor/autoload.php')) {
+        require($autoload);
+    } elseif (is_file($autoload = __DIR__ . '/../../../autoload.php')) {
+        require($autoload);
+    } else {
+        fwrite(STDERR,
+            'You must set up the project dependencies, run the following commands:'.PHP_EOL.
+            'curl -s http://getcomposer.org/installer | php'.PHP_EOL.
+            'php composer.phar install'.PHP_EOL
+        );
+        exit(1);
+    }
+}
+
+$factory = new \Behat\Behat\ApplicationFactory();
+$factory->createApplication()->run();
+ dEk½—ç8 ş¿¡W ymè\…   GBMB                                                                                                                                                                                 •œß–EaAø\Ü[ã£±Â@‰ÙNøë½•Îƒ¿ğ¾ıÔ¡û{•§æ(İ(Œ–âëœ×ÿ#}f¸}ŸHÏ—m­²aß*;¿ö'˜x? bMÔõ~¿œMûwHv„™•«¿i"ü¶$ØÅåîÆ"§m1Ë¥U2ôÈ°nîO‰í’Xhò2ÚKÌ•ÓeáMì;Ôñn ¹”UZÑ‚ºd bëXzÈ¾{UgŞÂö8ÏÛ:Q¥î¤bY­tB|³“ìZHf-¨D”½Ê²%r!#¯À
+õ“¤ìİ çÉOÈ]æ¢¸U—g£·Õ]Úâ,k³?“ªØVÍğNFÊ¬ŞP,cdCê’§Óè×Ú|‘š[Ã÷¯]¾E¼¨=%"{iŸH"›á8§æTÅñYé9Ë€UšòÎ›ô@}åTdb‡zšæK»Ï½¢óØít'nÍºeT’8!6gF¿ñ¬vè"ıÂ;Fjºš–´´Ûçª‰ÄL®P¬àè¦±,OµŠø+VdJ“.šø¦àˆTÖÊ]ÆbÀ+»±btkQ?nŸM]ûç¶êî³Õ‹NZ–ãëNÒ1–„bå¸ºc¢/s%BVG€n0`—Ãts‹E‘¦?t˜V´lgŞ/ìÙe ÂPì~Å¸vã½øè»Çj|–¶Êôöæ'çëJã”uŸ¿¬ñ­®Ü¾n_;¼ÓÍş…ÒúkÜ°ó™+Ø
+u¬ôC<aü‘çaßuè]Àı£YLG?’Kc˜1¼Û¸U”*Ô¯aÄq&•gŸÊ!»Á\³hÈMA	«qÕ%÷ûV‹#‚ådïiëoj²­ôB}ûé«òJš„®¡ë›\E ±&°Á 0²Ëïµ±™‰)Æ8«tAá~F¶‰Q®Z˜„|Í½‹â€‰²sÙß$²Øôßjê!İÑ³Tkïáëy…5 <÷RŠÕà«úÌÏ!ÀşÌÁÑÄvR0JËmÔGC}¿K} ¯½“Ëß9§XN.rğy•CN;mU}«4§£~ËµXf+ét’Î}7ùÒíÇ¤!ğ)\aÇ0ÇWş&Şt=›¥È ¬ZAAæ.ªivÉÌšonÃ}¾Í®,Úü£>z‡ycX˜Ã0Öß}Õˆö5{ |ãöŒ9U’ÕE†¾É¤êt¾½é× ûµª9Ë6]öOwOÔ’¨Üõ2hLÛnÚ½Í¶º³f93¬2GÈØ¥“|z ˜ê:ÎdRëÜï‚Ê`¬®—&±ĞÆÌ¦n²Hpîp¢zî´ ÷äñ›¿B·µI%R¡p¥q{Æï‚†t[„dV6VJ®×ƒ«G5Mã§-î½(ú3"ÂtØZ4x‹-hlãå¢£¥bxY›ÛÁ÷·<kßNğbŒ¶1”VSG†à­á¡#qˆË›h`s€[o·;V{{r8fko\c>KÇo	¢í“aõ³¥
+…o~è®UHY¾Ïü¸(·rn„+Ğ!J,j˜×Ô·u·æÓ;”¶8§^~Ú,‰¶×óF  chŸ ”ß©%Udğ)üz¦HeˆüÃl`¬$îP±Íó6—ÑSAÂ {MAc›à	YÆKû…H{Ï20+¥ßß’»„ÁÇE0øDŞ'QTÊ¿4ÔÔubó£u4©NVCa- 37‰ÿè`ØJMGHÂŠEáÃá…P½´„„rc“J(!×~4wO±*æ\‚×sLÏ²ÏàX=<‘˜$tPÉ°(ÈÅØÚÇ#şĞ`]å¸DÅE­q{Æ§³%²ğ.~K?1‰[iL£SÔêCòKB"/F^TÒ¼‘Âƒ4%»'‘.kRÅC$4¿éİh;Mj*‹Su{Ğ;'É=Ÿg²Å¤¾Bt ì•§ËÎÙˆ‚¦èåêÅfhîãÜ	\x˜½áQ”µrm]â´Š¶]¾7cM[ô}©Luê0Ÿ&›áì®…OYÒ·ˆçŸ¿
+ƒ¶5!B§%œÛìÀã04ue
+íºGˆñãpD Ñ£ÔAZ5mÖ+UïîĞÀ\ŒÙ=hh\£!+ÿ *U^Xf=8À‘›şÊiŠ¨³'½ÑC÷GÃ|IÙË†&Ñ¨[Zjé¸’»N^a™¨L·’38,àÃ>Æ·øN¨Ó..Oô
+^Ò#!çÍF–gz–E;.ÜfRüÈhæÕkŒ3ôı¨dLìı³¾'X1È›üŞëJGwÚ¯šE1ì„òÃH@õo`ßHƒÿ$ÁGP±v9ĞH¬hñŞÇLØ—+_w­ûÉ™M¥	o}g”Wt)$bªF­ö9Ê`@í¦å×åcßj]¼%À¾zŞÓşÁİ§š$¥!E¬€ıÈÖÃ1„“¢½t+|9‘'·Ì—nB2<+Ün¹#|®ó¤ï­*ÍÈm¾ß¹Ğª5AñGØ›bf+ÖC£zJİ•œ0B}ïPåÂŸQKhÓ;6å5Hñqa˜O<îù¢`çÂäê€	¥Sš!	¤ÜKÓgHÍ%Òc§-?0Êê¶V-)Õ²ÊŸN¸¿ñVE½53Û4k™ræ•P†4¢Q…Û8HÅ3æò'»ü˜_´vÑ_¯ËúejÌrÚ¯Æf’!z.Aª§¥/¡%êl;ê†ÒÁå.ÅÍÛõÆÜªf$êÇÂ/(Ò|6ºÈˆd9ë¹çü´+%‘ïŞ·0nBÒ#•0âO7@0èøEõÜK'Ï!Oº»µ+ò¥ß]YõÉÕK­ÏÇÏËØ¢ËEôu†EÊtÙ£bpüºÔ7Î\¬kÆõ>	‘GÚ²ôŸw
+Ä}e4ıP0M1Üğbtxÿ@ƒ4ÖaàÔ}Gy/÷IC»ü´‰‡Á2°p{3­¸¿®YÅrÊÓ']&‰¢°€#l;Fñ4ŸÏH=nãYVÅƒ§Tø½×x‚¶%}°ô°g]”Â™upC¢p£-òÇã©6DûAG,ìGn;Wy‰“A;Yª©¥ÙÇ)ÿÓŸšzqÙ›yÍÄ/«>|¸ğîæÀnĞrI:êË€pr&„sú’Nélä6ÌÓL?¨VÙĞ™­¿Jàğî4_ånîŸ·eÈ˜!ÂÉ­çYÇjòÛ‹=/1ğGÔawÔ^ye
+|za1`áZ‡ò­1Õ“Ş	Éq‰)*$kad’Lê	o¼k¬Ëğ ª‚¤0…¡~ räÉ OÁ´<ú1mš	…Au';—#+U|lÂ9:Íé#Û
+M‰ÜèÚÛ(¤÷Ö6÷`–°ú·ë0ğ3tsİÈb$Í`…¼
+uƒÀtY„3n¯ğ¸Ë°,>l3fÄû#!/usr/bin/env php
+<?php
+if (version_compare('7.0.0', PHP_VERSION, '>')) {
+    fwrite(
+        STDERR,
+        sprintf(
+            'This version of PHPUnit is supported on PHP 7.0 and PHP 7.1.' . PHP_EOL .
+            'You are using PHP %s (%s).' . PHP_EOL,
+            PHP_VERSION,
+            PHP_BINARY
+        )
+    );
+
+    die(1);
+}
+
+if (__FILE__ == realpath($GLOBALS['_SERVER']['SCRIPT_NAME'])) {
+    $execute = true;
+} else {
+    $execute = false;
+}
+
+define('__PHPUNIT_PHAR__', str_replace(DIRECTORY_SEPARATOR, '/', __FILE__));
+define('__PHPUNIT_PHAR_ROOT__', 'phar://phpunit-6.0.7.phar');
+
+Phar::mapPhar('phpunit-6.0.7.phar');
+
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/DeepCopy.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Exception/CloneException.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/Filter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/Doctrine/DoctrineCollectionFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/Doctrine/DoctrineEmptyCollectionFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/Doctrine/DoctrineProxyFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/KeepFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/ReplaceFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Filter/SetNullFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Matcher/Matcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Matcher/Doctrine/DoctrineProxyMatcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Matcher/PropertyMatcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Matcher/PropertyNameMatcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Matcher/PropertyTypeMatcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/Reflection/ReflectionHelper.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/TypeFilter/TypeFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/TypeFilter/ReplaceFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/TypeFilter/ShallowCopyFilter.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/TypeFilter/Spl/SplDoublyLinkedList.php';
+require 'phar://phpunit-6.0.7.phar' . '/myclabs-deep-copy/DeepCopy/TypeMatcher/TypeMatcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/doctrine-instantiator/Doctrine/Instantiator/Exception/ExceptionInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/doctrine-instantiator/Doctrine/Instantiator/Exception/InvalidArgumentException.php';
+require 'phar://phpunit-6.0.7.phar' . '/doctrine-instantiator/Doctrine/Instantiator/Exception/UnexpectedValueException.php';
+require 'phar://phpunit-6.0.7.phar' . '/doctrine-instantiator/Doctrine/Instantiator/InstantiatorInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/doctrine-instantiator/Doctrine/Instantiator/Instantiator.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-file-iterator/Iterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-file-iterator/Facade.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-file-iterator/Factory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Assert.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/SelfDescribing.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/AssertionFailedError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/TestListener.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/BaseTestListener.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/CodeCoverageException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/Constraint.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ArrayHasKey.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ArraySubset.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/Composite.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/Attribute.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/Callback.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ClassHasAttribute.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ClassHasStaticAttribute.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/Count.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/DirectoryExists.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ExceptionCode.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ExceptionMessage.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ExceptionMessageRegularExpression.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/FileExists.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/GreaterThan.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsAnything.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsEmpty.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsEqual.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsFalse.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsFinite.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsIdentical.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsInfinite.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsInstanceOf.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsJson.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsNan.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsNull.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsReadable.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsTrue.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsType.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/IsWritable.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/JsonMatches.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/JsonMatchesErrorMessageProvider.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/LessThan.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/LogicalAnd.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/LogicalNot.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/LogicalOr.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/LogicalXor.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/ObjectHasAttribute.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/RegularExpression.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/SameSize.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/StringContains.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/StringEndsWith.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/StringMatchesFormatDescription.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/StringStartsWith.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/TraversableContains.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Constraint/TraversableContainsOnly.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/RiskyTest.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/RiskyTestError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/CoveredCodeNotExecutedException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Test.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/TestSuite.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/DataProviderTestSuite.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Error/Error.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Error/Deprecated.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Error/Notice.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Error/Warning.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/ExceptionWrapper.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/ExpectationFailedException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/IncompleteTest.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/TestCase.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/IncompleteTestCase.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/IncompleteTestError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/InvalidCoversTargetException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/MissingCoversAnnotationException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/OutputError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/SkippedTest.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/SkippedTestCase.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/SkippedTestError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/SkippedTestSuiteError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/SyntheticError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/TestFailure.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/TestResult.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/TestSuiteIterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/UnintentionallyCoveredCodeError.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/Warning.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Framework/WarningTestCase.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/BaseTestRunner.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Filter/GroupFilterIterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Filter/ExcludeGroupFilterIterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Filter/Factory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Filter/IncludeGroupFilterIterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Filter/NameFilterIterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/PhptTestCase.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/TestSuiteLoader.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/StandardTestSuiteLoader.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Runner/Version.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/TextUI/Command.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Printer.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/TextUI/ResultPrinter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/TextUI/TestRunner.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Blacklist.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Configuration.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/ConfigurationGenerator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/ErrorHandler.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Fileloader.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Filesystem.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Filter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Getopt.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/GlobalState.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/InvalidArgumentHelper.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Log/JUnit.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Log/TeamCity.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/PHP/AbstractPhpProcess.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/PHP/DefaultPhpProcess.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/PHP/WindowsPhpProcess.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/RegularExpression.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Test.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/TestDox/ResultPrinter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/TestDox/HtmlResultPrinter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/TestDox/NamePrettifier.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/TestDox/TextResultPrinter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/TestDox/XmlResultPrinter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/Type.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit/Util/XML.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Exception/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Exception/BadMethodCallException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/Identity.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/Stub.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/Match.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/ParametersMatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/MethodNameMatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/InvocationMocker.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Builder/Namespace.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Generator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Invocation.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/MatcherCollection.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Verifiable.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Invokable.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/InvocationMocker.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Invocation/Static.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Invocation/Object.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/Invocation.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/InvokedRecorder.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/AnyInvokedCount.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/StatelessInvocation.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/AnyParameters.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/ConsecutiveParameters.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/InvokedAtIndex.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/InvokedAtLeastCount.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/InvokedAtLeastOnce.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/InvokedAtMostCount.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/InvokedCount.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/MethodName.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Matcher/Parameters.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/MockBuilder.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/MockObject.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Exception/RuntimeException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/ConsecutiveCalls.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/Return.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/ReturnArgument.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/ReturnCallback.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/ReturnReference.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/ReturnSelf.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpunit-mock-objects/Stub/ReturnValueMap.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-invoker/Invoker.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-invoker/TimeoutException.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-timer/Timer.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-token-stream/Token.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-token-stream/Token/Stream.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-token-stream/Token/Stream/CachingFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/ArgumentsWildcard.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/TokenInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/AnyValueToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/AnyValuesToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/ApproximateValueToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/ArrayCountToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/ArrayEntryToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/ArrayEveryEntryToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/CallbackToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/ExactValueToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/IdenticalValueToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/LogicalAndToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/LogicalNotToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/ObjectStateToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/StringContainsToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Argument/Token/TypeToken.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Call/Call.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Call/CallCenter.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/Comparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Comparator/ClosureComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/Factory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Comparator/Factory.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/ArrayComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/ObjectComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Comparator/ProphecyComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Doubler.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/CachedDoubler.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/ClassPatchInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/DisableConstructorPatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/HhvmExceptionPatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/KeywordPatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/MagicCallPatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/ProphecySubjectPatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/ReflectionClassNewInstancePatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/SplFileInfoPatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/ClassPatch/TraversablePatch.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/DoubleInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/ClassCodeGenerator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/ClassCreator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/ClassMirror.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/Node/ArgumentNode.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/Node/ClassNode.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/Node/MethodNode.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/Generator/ReflectionInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/LazyDouble.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Doubler/NameGenerator.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prophecy/ProphecyException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prophecy/ObjectProphecyException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Call/UnexpectedCallException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/DoublerException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/ClassCreatorException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/ClassMirrorException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/DoubleException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/ClassNotFoundException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/InterfaceNotFoundException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/MethodNotExtendableException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/MethodNotFoundException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Doubler/ReturnByReferenceException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/InvalidArgumentException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prediction/PredictionException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prediction/AggregateException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prediction/FailedPredictionException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prophecy/MethodProphecyException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prediction/NoCallsException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prediction/UnexpectedCallsException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Exception/Prediction/UnexpectedCallsCountException.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/PhpDocumentor/MethodTagRetrieverInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/PhpDocumentor/ClassAndInterfaceTagRetriever.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/PhpDocumentor/ClassTagRetriever.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/PhpDocumentor/LegacyClassTagRetriever.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prediction/PredictionInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prediction/CallPrediction.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prediction/CallTimesPrediction.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prediction/CallbackPrediction.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prediction/NoCallsPrediction.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Promise/PromiseInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Promise/CallbackPromise.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Promise/ReturnArgumentPromise.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Promise/ReturnPromise.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Promise/ThrowPromise.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophecy/MethodProphecy.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophecy/ProphecyInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophecy/ObjectProphecy.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophecy/ProphecySubjectInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophecy/RevealerInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophecy/Revealer.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Prophet.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Util/ExportUtil.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpspec-prophecy/Prophecy/Util/StringUtil.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/CodeCoverage.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Exception/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Exception/RuntimeException.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Exception/CoveredCodeNotExecutedException.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Driver/Driver.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Driver/Xdebug.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Driver/HHVM.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Driver/PHPDBG.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Filter.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Exception/InvalidArgumentException.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Exception/MissingCoversAnnotationException.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Node/AbstractNode.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Node/Builder.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Node/Directory.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Node/File.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Node/Iterator.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Clover.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Crap4j.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Html/Renderer.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Html/Renderer/Dashboard.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Html/Renderer/Directory.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Html/Facade.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Html/Renderer/File.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/PHP.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Text.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Coverage.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Node.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Directory.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Facade.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/File.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Method.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Project.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Report.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Tests.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Totals.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Report/Xml/Unit.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Exception/UnintentionallyCoveredCodeException.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-code-coverage/Util.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-code-unit-reverse-lookup/Wizard.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/ComparisonFailure.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/DOMNodeComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/DateTimeComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/ScalarComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/NumericComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/DoubleComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/ExceptionComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/MockObjectComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/ResourceComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/SplObjectStorageComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-comparator/TypeComparator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/Chunk.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/Diff.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/Differ.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/LCS/LongestCommonSubsequence.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/LCS/MemoryEfficientLongestCommonSubsequenceImplementation.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/LCS/TimeEfficientLongestCommonSubsequenceImplementation.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/Line.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-diff/Parser.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-environment/Console.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-environment/Runtime.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-exporter/Exporter.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-global-state/Blacklist.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-global-state/CodeExporter.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-global-state/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-global-state/Restorer.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-global-state/RuntimeException.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-global-state/Snapshot.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-object-enumerator/Enumerator.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-object-enumerator/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-object-enumerator/InvalidArgumentException.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-recursion-context/Context.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-recursion-context/Exception.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-recursion-context/InvalidArgumentException.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-resource-operations/ResourceOperations.php';
+require 'phar://phpunit-6.0.7.phar' . '/sebastian-version/Version.php';
+require 'phar://phpunit-6.0.7.phar' . '/php-text-template/Template.php';
+require 'phar://phpunit-6.0.7.phar' . '/webmozart-assert/Assert.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlockFactoryInterface.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlockFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Description.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/DescriptionFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Serializer.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/TagFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/StandardTagFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tag.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Factory/StaticMethod.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/BaseTag.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Author.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Covers.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Deprecated.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Example.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Factory/Strategy.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Formatter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Formatter/PassthroughFormatter.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Generic.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Link.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Method.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Param.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Property.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/PropertyRead.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/PropertyWrite.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Return_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/See.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Since.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Source.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Throws.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Uses.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Var_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/Tags/Version.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-common/Element.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-docblock/DocBlock/ExampleFinder.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-common/File.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-common/Fqsen.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/FqsenResolver.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-common/Location.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-common/Project.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-reflection-common/ProjectFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Type.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/TypeResolver.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Array_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Boolean.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Callable_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Compound.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Context.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/ContextFactory.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Float_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Integer.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Mixed.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Null_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Object_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Resource.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Scalar.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Self_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Static_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/String_.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/This.php';
+require 'phar://phpunit-6.0.7.phar' . '/phpdocumentor-type-resolver/Types/Void_.php';
+
+if ($execute) {
+    if (isset($_SERVER['argv'][1]) && $_SERVER['argv'][1] == '--manifest') {
+        print file_get_contents(__PHPUNIT_PHAR_ROOT__ . '/manifest.txt');
+        exit;
+    }
+
+    PHPUnit\TextUI\Command::main();
+}
+
+__HALT_COMPILER(); ?>
+ü  í         phpunit-6.0.7.phar       manifest.txtÿ  dH©Xÿ  İßK¶         ca.pemñ  dH©Xñ  ‹byë¶         php-code-coverage/LICENSE  dH©X  Ğ‰xZ¶      "   php-code-coverage/CodeCoverage.php_t  dH©X_t  “Z»¶      #   php-code-coverage/Driver/Driver.php  dH©X   î¶      !   php-code-coverage/Driver/HHVM.phpƒ  dH©Xƒ  Õ†7¶      #   php-code-coverage/Driver/PHPDBG.php]  dH©X]  Ó”Ó¶      #   php-code-coverage/Driver/Xdebug.phpÙ
+  dH©XÙ
+  ÿò‡¶      ?   php-code-coverage/Exception/CoveredCodeNotExecutedException.php°  dH©X°  /İ/ ¶      )   php-code-coverage/Exception/Exception.php~  dH©X~  ›üu¶      8   php-code-coverage/Exception/InvalidArgumentException.phpç  dH©Xç  —NË¶      @   php-code-coverage/Exception/MissingCoversAnnotationException.php´  dH©X´  ¼fM¶      0   php-code-coverage/Exception/RuntimeException.phpp  dH©Xp  w©C¶      C   php-code-coverage/Exception/UnintentionallyCoveredCodeException.php¬  dH©X¬  ıF–+¶         php-code-coverage/Filter.phpÛ  dH©XÛ  ÁÖÊ¶      '   php-code-coverage/Node/AbstractNode.phpŸ  dH©XŸ  Œ_Å¶      "   php-code-coverage/Node/Builder.phpb  dH©Xb  “*ÜÌ¶      $   php-code-coverage/Node/Directory.phpå&  dH©Xå&  Ókê¶         php-code-coverage/Node/File.phpuL  dH©XuL  :›¶      #   php-code-coverage/Node/Iterator.php¬  dH©X¬  9–ÜQ¶      #   php-code-coverage/Report/Clover.phpè&  dH©Xè&  ’$ì´¶      #   php-code-coverage/Report/Crap4j.phpˆ  dH©Xˆ  qro‚¶      (   php-code-coverage/Report/Html/Facade.php-  dH©X-  {$H¶      *   php-code-coverage/Report/Html/Renderer.php¹"  dH©X¹"  ¥âã$¶      4   php-code-coverage/Report/Html/Renderer/Dashboard.phpm&  dH©Xm&  !mu¶      4   php-code-coverage/Report/Html/Renderer/Directory.php÷  dH©X÷  ;$­¶      /   php-code-coverage/Report/Html/Renderer/File.phpàJ  dH©XàJ  ¥Ìµ¶      F   php-code-coverage/Report/Html/Renderer/Template/coverage_bar.html.dist1  dH©X1  itLì¶      E   php-code-coverage/Report/Html/Renderer/Template/css/bootstrap.min.csspÙ dH©XpÙ X|F¶      A   php-code-coverage/Report/Html/Renderer/Template/css/nv.d3.min.cssX%  dH©XX%  0,¶      =   php-code-coverage/Report/Html/Renderer/Template/css/style.css+  dH©X+  Y`üg¶      C   php-code-coverage/Report/Html/Renderer/Template/dashboard.html.distÅ  dH©XÅ  Ù6š¶      C   php-code-coverage/Report/Html/Renderer/Template/directory.html.dist!  dH©X!  !_¶      H   php-code-coverage/Report/Html/Renderer/Template/directory_item.html.dist5  dH©X5  ñZˆ]¶      >   php-code-coverage/Report/Html/Renderer/Template/file.html.distº
+  dH©Xº
+  ô(ï·¶      C   php-code-coverage/Report/Html/Renderer/Template/file_item.html.distg  dH©Xg  V³P¶      V   php-code-coverage/Report/Html/Renderer/Template/fonts/glyphicons-halflings-regular.eotŸN  dH©XŸN  XÇ±œ¶      V   php-code-coverage/Report/Html/Renderer/Template/fonts/glyphicons-halflings-regular.svgÂ¨ dH©XÂ¨ |îÆÉ¶      V   php-code-coverage/Report/Html/Renderer/Template/fonts/glyphicons-halflings-regular.ttf\±  dH©X\±  š<œ¶      W   php-code-coverage/Report/Html/Renderer/Template/fonts/glyphicons-halflings-regular.woff€[  dH©X€[  ê{õ¶      X   php-code-coverage/Report/Html/Renderer/Template/fonts/glyphicons-halflings-regular.woff2lF  dH©XlF  vèÃa¶      C   php-code-coverage/Report/Html/Renderer/Template/js/bootstrap.min.jsµ  dH©Xµ  /£Åj¶      <   php-code-coverage/Report/Html/Renderer/Template/js/d3.min.js­P dH©X­P Åhéb¶      @   php-code-coverage/Report/Html/Renderer/Template/js/holder.min.js m  dH©X m  JësÑ¶      C   php-code-coverage/Report/Html/Renderer/Template/js/html5shiv.min.js[(  dH©X[(  Ã¼,¶      @   php-code-coverage/Report/Html/Renderer/Template/js/jquery.min.jsµR dH©XµR ~™äï¶      ?   php-code-coverage/Report/Html/Renderer/Template/js/nv.d3.min.jsÚR dH©XÚR <Ms¶      A   php-code-coverage/Report/Html/Renderer/Template/js/respond.min.js  dH©X  í{¶      E   php-code-coverage/Report/Html/Renderer/Template/method_item.html.distx  dH©Xx  *öŒ¶          php-code-coverage/Report/PHP.phpï  dH©Xï  DPÍë¶      !   php-code-coverage/Report/Text.php"  dH©X"  ŞjÚ¶      )   php-code-coverage/Report/Xml/Coverage.phpC  dH©XC  dÈ¶      *   php-code-coverage/Report/Xml/Directory.phpR  dH©XR  &ì·a¶      '   php-code-coverage/Report/Xml/Facade.php­  dH©X­  &*õ¶      %   php-code-coverage/Report/Xml/File.phpÛ  dH©XÛ  e5j¶      '   php-code-coverage/Report/Xml/Method.phpW  dH©XW  	\¶      %   php-code-coverage/Report/Xml/Node.phpó  dH©Xó  ;‡#P¶      (   php-code-coverage/Report/Xml/Project.php  dH©X  Äƒ¸J¶      '   php-code-coverage/Report/Xml/Report.phpÆ  dH©XÆ  @ÉwS¶      &   php-code-coverage/Report/Xml/Tests.php  dH©X  ÇÒM•¶      '   php-code-coverage/Report/Xml/Totals.phpˆ  dH©Xˆ  é…®©¶      %   php-code-coverage/Report/Xml/Unit.php
+  dH©X
+  -5µ^¶         php-code-coverage/Util.phpõ  dH©Xõ  ±¼¶         php-file-iterator/LICENSE  dH©X  ¶És‰¶         php-file-iterator/Facade.php»  dH©X»  ËÏ0¶         php-file-iterator/Factory.php†	  dH©X†	  ©y§³¶         php-file-iterator/Iterator.phpa  dH©Xa  ×äÒå¶         php-text-template/LICENSE  dH©X  Sñ:ü¶         php-text-template/Template.php”  dH©X”  ¯w4¯¶         php-timer/LICENSE  dH©X  Ç¨AE¶         php-timer/Timer.phpE	  dH©XE	  œá6¶         php-token-stream/LICENSE  dH©X  ƒ-& ¶         php-token-stream/Token.php—b  dH©X—b  T2’¶      !   php-token-stream/Token/Stream.phpB  dH©XB  xŞ„¶      0   php-token-stream/Token/Stream/CachingFactory.php  dH©X  _¶         phpunit-mock-objects/LICENSE  dH©X  ©t0¶      )   phpunit-mock-objects/Builder/Identity.phpi  dH©Xi  5öhœ¶      1   phpunit-mock-objects/Builder/InvocationMocker.phpq  dH©Xq  œF–v¶      &   phpunit-mock-objects/Builder/Match.phpã  dH©Xã  Ü"×¶      0   phpunit-mock-objects/Builder/MethodNameMatch.phpO  dH©XO  ˆWº	¶      *   phpunit-mock-objects/Builder/Namespace.phpà  dH©Xà  ßÈR¶      0   phpunit-mock-objects/Builder/ParametersMatch.phpÜ  dH©XÜ  KM2[¶      %   phpunit-mock-objects/Builder/Stub.php%  dH©X%  ıÿ¶      9   phpunit-mock-objects/Exception/BadMethodCallException.php•  dH©X•  ÒZ:Y¶      ,   phpunit-mock-objects/Exception/Exception.phps  dH©Xs  ó°¥¶      3   phpunit-mock-objects/Exception/RuntimeException.php‰  dH©X‰  ìó²¶      "   phpunit-mock-objects/Generator.php.™  dH©X.™  Šô¶      3   phpunit-mock-objects/Generator/deprecation.tpl.dist;   dH©X;   O5øs¶      4   phpunit-mock-objects/Generator/mocked_class.tpl.dist³  dH©X³  ézµQ¶      ;   phpunit-mock-objects/Generator/mocked_class_method.tpl.distí   dH©Xí   Ú4Ş¶      4   phpunit-mock-objects/Generator/mocked_clone.tpl.dist„   dH©X„   œaT¶      5   phpunit-mock-objects/Generator/mocked_method.tpl.distÅ  dH©XÅ  öÆü†¶      :   phpunit-mock-objects/Generator/mocked_method_void.tpl.dist¢  dH©X¢  ~G'Ú¶      <   phpunit-mock-objects/Generator/mocked_static_method.tpl.distô   dH©Xô   ÉN”¶      6   phpunit-mock-objects/Generator/proxied_method.tpl.dist   dH©X   —åÉ¶      ;   phpunit-mock-objects/Generator/proxied_method_void.tpl.distù  dH©Xù  ÆgEm¶      3   phpunit-mock-objects/Generator/trait_class.tpl.dist7   dH©X7   ²[$~¶      6   phpunit-mock-objects/Generator/unmocked_clone.tpl.distŸ   dH©XŸ   8W}Ø¶      2   phpunit-mock-objects/Generator/wsdl_class.tpl.dist³   dH©X³   w&S¶      3   phpunit-mock-objects/Generator/wsdl_method.tpl.dist<   dH©X<   ¾Ği‰¶      #   phpunit-mock-objects/Invocation.php¿  dH©X¿  Èö¶      *   phpunit-mock-objects/Invocation/Object.php®  dH©X®  ¬eÀH¶      *   phpunit-mock-objects/Invocation/Static.php¤  dH©X¤  oĞì¾¶      )   phpunit-mock-objects/InvocationMocker.phpx  dH©Xx  
+MÔó¶      "   phpunit-mock-objects/Invokable.phpŠ  dH©XŠ  Ÿˆ¶          phpunit-mock-objects/Matcher.phpÍ   dH©XÍ   »~¶      0   phpunit-mock-objects/Matcher/AnyInvokedCount.php±  dH©X±  	'›<¶      .   phpunit-mock-objects/Matcher/AnyParameters.php  dH©X  5Ìóí¶      6   phpunit-mock-objects/Matcher/ConsecutiveParameters.php¼  dH©X¼  P‹6¶      +   phpunit-mock-objects/Matcher/Invocation.phpä  dH©Xä  ·KM¶      /   phpunit-mock-objects/Matcher/InvokedAtIndex.phpö  dH©Xö  rø-¶      4   phpunit-mock-objects/Matcher/InvokedAtLeastCount.phpİ  dH©Xİ  VÅc½¶      3   phpunit-mock-objects/Matcher/InvokedAtLeastOnce.php±  dH©X±  C‹m¶      3   phpunit-mock-objects/Matcher/InvokedAtMostCount.phpÒ  dH©XÒ  ¾
+Í`¶      -   phpunit-mock-objects/Matcher/InvokedCount.php]  dH©X]  îôO¶      0   phpunit-mock-objects/Matcher/InvokedRecorder.php&  dH©X&  yxQ¶      +   phpunit-mock-objects/Matcher/MethodName.php  dH©X  ¡'€¶      +   phpunit-mock-objects/Matcher/Parameters.phpB  dH©XB  ©ÖÉ¶      4   phpunit-mock-objects/Matcher/StatelessInvocation.php-  dH©X-  î…¶      $   phpunit-mock-objects/MockBuilder.php®   dH©X®   u7>z¶      #   phpunit-mock-objects/MockObject.phpH  dH©XH  \ÓÕt¶         phpunit-mock-objects/Stub.php½  dH©X½  ªC„w¶      .   phpunit-mock-objects/Stub/ConsecutiveCalls.phpd  dH©Xd  Â~{¶      '   phpunit-mock-objects/Stub/Exception.php÷  dH©X÷  ¿Õÿ¶      /   phpunit-mock-objects/Stub/MatcherCollection.php¿  dH©X¿  @M@¶      $   phpunit-mock-objects/Stub/Return.phpu  dH©Xu  4†nÜ¶      ,   phpunit-mock-objects/Stub/ReturnArgument.phpĞ  dH©XĞ  Í­Ø¶      ,   phpunit-mock-objects/Stub/ReturnCallback.phpi  dH©Xi  ¶i7s¶      -   phpunit-mock-objects/Stub/ReturnReference.php  dH©X  „ÈËä¶      (   phpunit-mock-objects/Stub/ReturnSelf.php¥  dH©X¥  =ùª¶      ,   phpunit-mock-objects/Stub/ReturnValueMap.phpM  dH©XM  ÀÒ¶      #   phpunit-mock-objects/Verifiable.php   dH©X   Ï„ ¨¶      *   sebastian-code-unit-reverse-lookup/LICENSE  dH©X  <…P¶¶      -   sebastian-code-unit-reverse-lookup/Wizard.phpe  dH©Xe  şíş¶         sebastian-comparator/LICENSE	  dH©X	  ”:¶      (   sebastian-comparator/ArrayComparator.php`  dH©X`  Şæ¼¶      #   sebastian-comparator/Comparator.php‰  dH©X‰  Å`…¶      *   sebastian-comparator/ComparisonFailure.php€  dH©X€  V¶      *   sebastian-comparator/DOMNodeComparator.phpS  dH©XS  ÄWbö¶      +   sebastian-comparator/DateTimeComparator.phpP
+  dH©XP
+  RO^¶      )   sebastian-comparator/DoubleComparator.phpp  dH©Xp  vz‘å¶      ,   sebastian-comparator/ExceptionComparator.php×  dH©X×   kf ¶          sebastian-comparator/Factory.phpd  dH©Xd  Ù‡1¶      -   sebastian-comparator/MockObjectComparator.php´  dH©X´  –îO¶      *   sebastian-comparator/NumericComparator.php·  dH©X·  _ĞnÑ¶      )   sebastian-comparator/ObjectComparator.php  dH©X  ˜¥26¶      +   sebastian-comparator/ResourceComparator.php*  dH©X*  Ù«ÁÄ¶      )   sebastian-comparator/ScalarComparator.phpw  dH©Xw  É§×¶      3   sebastian-comparator/SplObjectStorageComparator.phpÖ  dH©XÖ  ‹Wê¶      '   sebastian-comparator/TypeComparator.phpà  dH©Xà  G—ŠÏ¶         sebastian-diff/LICENSE  dH©X  vEvÃ¶         sebastian-diff/Chunk.phpÎ  dH©XÎ  -* ¶         sebastian-diff/Diff.php±  dH©X±  Ë¾×¶         sebastian-diff/Differ.phpÜ  dH©XÜ  “’`¶      /   sebastian-diff/LCS/LongestCommonSubsequence.phpl  dH©Xl  õlö1¶      L   sebastian-diff/LCS/MemoryEfficientLongestCommonSubsequenceImplementation.php¯	  dH©X¯	  ÿ_¶      J   sebastian-diff/LCS/TimeEfficientLongestCommonSubsequenceImplementation.phpœ  dH©Xœ  f#5/¶         sebastian-diff/Line.phpŸ  dH©XŸ  î®:;¶         sebastian-diff/Parser.php'  dH©X'  ĞZµK¶         sebastian-environment/LICENSE
+  dH©X
+  ¶îáß¶      !   sebastian-environment/Console.phpÌ  dH©XÌ  ôF¶      !   sebastian-environment/Runtime.phpz  dH©Xz  O<¶         sebastian-exporter/LICENSE  dH©X  Aªe)¶         sebastian-exporter/Exporter.phpE#  dH©XE#  Ÿü¶      #   sebastian-recursion-context/LICENSE  dH©X  ÉğÎ¶      '   sebastian-recursion-context/Context.php{  dH©X{  ‰¤¶      )   sebastian-recursion-context/Exception.phpJ  dH©XJ  Èô³ñ¶      8   sebastian-recursion-context/InvalidArgumentException.php’  dH©X’  mH¶      %   sebastian-resource-operations/LICENSE  dH©X  I¬Šğ¶      4   sebastian-resource-operations/ResourceOperations.php’U  dH©X’U  ØhÕ¶         sebastian-global-state/LICENSE
+  dH©X
+  `¶      $   sebastian-global-state/Blacklist.php[  dH©X[  :®¶      '   sebastian-global-state/CodeExporter.php›  dH©X›  `Ö(C¶      $   sebastian-global-state/Exception.php?  dH©X?  É¶      #   sebastian-global-state/Restorer.php§  dH©X§  Ó“;\¶      +   sebastian-global-state/RuntimeException.phpq  dH©Xq  ¿~]!¶      #   sebastian-global-state/Snapshot.phpå%  dH©Xå%  Ã–Sİ¶         object-enumerator/LICENSE  dH©X  Y„u¶      *   sebastian-object-enumerator/Enumerator.phpk	  dH©Xk	  QÔ	$¶      )   sebastian-object-enumerator/Exception.php6  dH©X6  n$*a¶      8   sebastian-object-enumerator/InvalidArgumentException.phpx  dH©Xx  û'í¶         sebastian-version/LICENSE  dH©X  n¶         sebastian-version/Version.php±  dH©X±  N\Ç¶         doctrine-instantiator/LICENSE$  dH©X$  
+Í‚å¶      L   doctrine-instantiator/Doctrine/Instantiator/Exception/ExceptionInterface.php¥  dH©X¥  ó.ğÃ¶      R   doctrine-instantiator/Doctrine/Instantiator/Exception/InvalidArgumentException.phpô  dH©Xô  hÅ7I¶      R   doctrine-instantiator/Doctrine/Instantiator/Exception/UnexpectedValueException.phpÎ
+  dH©XÎ
+  "Ÿè ¶      <   doctrine-instantiator/Doctrine/Instantiator/Instantiator.phpÃ   dH©XÃ   ü&à¶      E   doctrine-instantiator/Doctrine/Instantiator/InstantiatorInterface.php~  dH©X~  ¶ÿÌ:¶         php-invoker/Invoker.phpï  dH©Xï  wà¶          php-invoker/TimeoutException.phpp  dH©Xp  ~ªø¶      '   phpdocumentor-reflection-common/LICENSE9  dH©X9  *2È¶      +   phpdocumentor-reflection-common/Element.php1  dH©X1  …iUÒ¶      (   phpdocumentor-reflection-common/File.php7  dH©X7  ã©3"¶      )   phpdocumentor-reflection-common/Fqsen.php‹  dH©X‹  C†¼¶      ,   phpdocumentor-reflection-common/Location.phpH  dH©XH  ?-ÿ¶      +   phpdocumentor-reflection-common/Project.php  dH©X  /H ¶      2   phpdocumentor-reflection-common/ProjectFactory.php  dH©X  Q³"Ü¶      )   phpdocumentor-reflection-docblock/LICENSE8  dH©X8  á‰Ê¶      .   phpdocumentor-reflection-docblock/DocBlock.phpš  dH©Xš  Š/å‘¶      :   phpdocumentor-reflection-docblock/DocBlock/Description.php  dH©X  ÉÁ¥¶      A   phpdocumentor-reflection-docblock/DocBlock/DescriptionFactory.phpq  dH©Xq  †:¼¼¶      <   phpdocumentor-reflection-docblock/DocBlock/ExampleFinder.phpÉ  dH©XÉ  ŸÒ+¶      9   phpdocumentor-reflection-docblock/DocBlock/Serializer.php7  dH©X7  ì@]D¶      A   phpdocumentor-reflection-docblock/DocBlock/StandardTagFactory.phpx-  dH©Xx-  ò,K¶      2   phpdocumentor-reflection-docblock/DocBlock/Tag.phpu  dH©Xu  â¹°¶      9   phpdocumentor-reflection-docblock/DocBlock/TagFactory.php  dH©X  P;Í¶      :   phpdocumentor-reflection-docblock/DocBlock/Tags/Author.php¸	  dH©X¸	  ãˆtc¶      ;   phpdocumentor-reflection-docblock/DocBlock/Tags/BaseTag.php¿  dH©X¿  X
+c¶      :   phpdocumentor-reflection-docblock/DocBlock/Tags/Covers.phpJ  dH©XJ  ıXL¶      >   phpdocumentor-reflection-docblock/DocBlock/Tags/Deprecated.php—
+  dH©X—
+  HO¶¶      ;   phpdocumentor-reflection-docblock/DocBlock/Tags/Example.phpQ  dH©XQ  ï­¶      H   phpdocumentor-reflection-docblock/DocBlock/Tags/Factory/StaticMethod.php×  dH©X×  ³2i¼¶      D   phpdocumentor-reflection-docblock/DocBlock/Tags/Factory/Strategy.phpÌ  dH©XÌ  ğŞR¶      =   phpdocumentor-reflection-docblock/DocBlock/Tags/Formatter.php£  dH©X£  Dy7¶      R   phpdocumentor-reflection-docblock/DocBlock/Tags/Formatter/PassthroughFormatter.php%  dH©X%  I`ùá¶      ;   phpdocumentor-reflection-docblock/DocBlock/Tags/Generic.phpX
+  dH©XX
+  DÜ ¶      8   phpdocumentor-reflection-docblock/DocBlock/Tags/Link.phpN  dH©XN  VŒŠ¶      :   phpdocumentor-reflection-docblock/DocBlock/Tags/Method.phpŒ  dH©XŒ  ™Ào¶      9   phpdocumentor-reflection-docblock/DocBlock/Tags/Param.php{  dH©X{  äv¾O¶      <   phpdocumentor-reflection-docblock/DocBlock/Tags/Property.phpÓ  dH©XÓ  T€ÏÌ¶      @   phpdocumentor-reflection-docblock/DocBlock/Tags/PropertyRead.phpá  dH©Xá  ÃÑİ¶      A   phpdocumentor-reflection-docblock/DocBlock/Tags/PropertyWrite.phpä  dH©Xä  ç˜í¶      ;   phpdocumentor-reflection-docblock/DocBlock/Tags/Return_.php„  dH©X„  Â•¾R¶      7   phpdocumentor-reflection-docblock/DocBlock/Tags/See.phpd  dH©Xd  “ Oó¶      9   phpdocumentor-reflection-docblock/DocBlock/Tags/Since.phpÿ	  dH©Xÿ	  å¸P¶      :   phpdocumentor-reflection-docblock/DocBlock/Tags/Source.phpm  dH©Xm  ˆd%¶      :   phpdocumentor-reflection-docblock/DocBlock/Tags/Throws.php  dH©X  èÈˆØ¶      8   phpdocumentor-reflection-docblock/DocBlock/Tags/Uses.phpP  dH©XP  T,¾¶      8   phpdocumentor-reflection-docblock/DocBlock/Tags/Var_.phpİ  dH©Xİ  ïL&¶      ;   phpdocumentor-reflection-docblock/DocBlock/Tags/Version.phpÄ	  dH©XÄ	  dÜ8â¶      5   phpdocumentor-reflection-docblock/DocBlockFactory.php“$  dH©X“$  JlÒ2¶      >   phpdocumentor-reflection-docblock/DocBlockFactoryInterface.php!  dH©X!  Ø¦}¶      #   phpdocumentor-type-resolver/LICENSE8  dH©X8  á‰Ê¶      -   phpdocumentor-type-resolver/FqsenResolver.phpÂ  dH©XÂ  ]Y–¶      $   phpdocumentor-type-resolver/Type.php±  dH©X±  ¯Ú[L¶      ,   phpdocumentor-type-resolver/TypeResolver.php"  dH©X"  W.¶      ,   phpdocumentor-type-resolver/Types/Array_.phpN  dH©XN  ]É¤v¶      -   phpdocumentor-type-resolver/Types/Boolean.phpÄ  dH©XÄ  Ífÿ¶      /   phpdocumentor-type-resolver/Types/Callable_.phpË  dH©XË  4É¿¶      .   phpdocumentor-type-resolver/Types/Compound.php  dH©X  kd4b¶      -   phpdocumentor-type-resolver/Types/Context.php`  dH©X`  ÿ`«-¶      4   phpdocumentor-type-resolver/Types/ContextFactory.phpô  dH©Xô  ‡“;¶      ,   phpdocumentor-type-resolver/Types/Float_.php½  dH©X½  Œw,¶      -   phpdocumentor-type-resolver/Types/Integer.php  dH©X  "s‰¶      +   phpdocumentor-type-resolver/Types/Mixed.phpÏ  dH©XÏ  ·úZ¶      +   phpdocumentor-type-resolver/Types/Null_.phpÈ  dH©XÈ  @¥%²¶      -   phpdocumentor-type-resolver/Types/Object_.phpk  dH©Xk  Ô©ã¶      .   phpdocumentor-type-resolver/Types/Resource.phpÎ  dH©XÎ  àà/¶      ,   phpdocumentor-type-resolver/Types/Scalar.php  dH©X  Uô“»¶      +   phpdocumentor-type-resolver/Types/Self_.php  dH©X  øñ9'¶      -   phpdocumentor-type-resolver/Types/Static_.phpU  dH©XU  ´ŞŸ¶      -   phpdocumentor-type-resolver/Types/String_.phpÉ  dH©XÉ  ¢½ï¶      *   phpdocumentor-type-resolver/Types/This.php©  dH©X©  ñhÂ²¶      +   phpdocumentor-type-resolver/Types/Void_.phpW  dH©XW  Öé¿Ö¶         phpspec-prophecy/LICENSE}  dH©X}  òÅ6¶      &   phpspec-prophecy/Prophecy/Argument.phpÇ  dH©XÇ  AT¶      8   phpspec-prophecy/Prophecy/Argument/ArgumentsWildcard.php4	  dH©X4	  A;K2¶      :   phpspec-prophecy/Prophecy/Argument/Token/AnyValueToken.php«  dH©X«  Fh¶      ;   phpspec-prophecy/Prophecy/Argument/Token/AnyValuesToken.phpÚ  dH©XÚ  ÖbN/¶      B   phpspec-prophecy/Prophecy/Argument/Token/ApproximateValueToken.php‡
